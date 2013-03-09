@@ -52,7 +52,7 @@ var projection = d3.geo.albersUsa();
 var path = d3.geo.path();
 
 var radius = d3.scale.sqrt()
-      .domain([0,700000000])
+      .domain([0,100])
       .range([0,50])
 
 var svg = d3.select("body").append("svg")
@@ -82,14 +82,17 @@ queue()
   function init( err, us, seq ) {
       window.seq = seq;
       
-      var totals = {},
+      totals = {},
+        max_groups = {},
         max = 0;
 
       seq.features.forEach(function( f ){
         cats.forEach(function(c){
           if (!totals[c]) totals[c] = 0;
+          if (!max_groups[c]) max_groups[c] = 0;
           var val = parseInt( f.properties[c].replace('$','').replace(/,/g, '') );
           if (val > max) max = val;
+          if (val > max_groups[c]) max_groups[c] = val;
           totals[c] += val;
         })
       });
@@ -145,10 +148,14 @@ queue()
   }
 
   function dots( key ){
+    radius = d3.scale.sqrt()
+      .domain([0,max_groups[key]])
+      .range([0,50]);
+
     svg.selectAll(".circle").transition()
       .duration(150)
       .style('fill', function( d ){ return color(key); })
-      .attr("r", function(d) { return radius(d.properties[key].replace('$','').replace(/,/g, '')); });
+      .attr("r", function(d) { return radius( d.properties[key].replace('$','').replace(/,/g, '')); });
   }
 
 </script>
