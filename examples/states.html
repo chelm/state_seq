@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+path {
+  fill: #ccc;
+  stroke: #fff;
+}
+
+circle {
+  fill: #555;
+  stroke: #fff;
+}
+
+#map {
+  margin-left:250px;
+}
+
+.bar{
+  background: #F0F;
+  margin:1px;
+  border:1px solid #FFF;
+  color:#fff;
+  text-align: center;
+  font-size:12px;
+  width:250px;
+}
+
+.bar:hover {
+  cursor: pointer;
+  border:1px solid #555;
+}
+  
+#bars {
+height: 200px;
+width: 200px;
+position: absolute;
+top: 0px;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v0.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script>
+
+var width = 960,
+    height = 500;
+
+var projection = d3.geo.albersUsa();
+var path = d3.geo.path();
+
+var radius = d3.scale.sqrt()
+      .domain([0,700000000])
+      .range([0,50])
+
+var svg = d3.select("body").append("svg")
+    .attr("id", "map")
+    .attr("width", width)
+    .attr("height", height);
+    
+var color = d3.scale.category20();
+
+var cats = [
+  "teachers_schools",
+  "cleanair_water", 
+  "military_readiness", 
+  "law_enforcement", 
+  "job_search_assistance",
+  "vaccines_children",
+  "public_health",
+  "stop_violence_against_women",
+  "nutrition_assistance"
+];
+
+queue()
+  .defer(d3.json,"../data/us.json")
+  .defer(d3.json, "../data/state_seq.geojson")
+  .await(init);
+
+  function init( err, us, seq ) {
+      window.seq = seq;
+      
+      var totals = {},
+        max = 0;
+
+      seq.features.forEach(function( f ){
+        cats.forEach(function(c){
+          if (!totals[c]) totals[c] = 0;
+          var val = parseInt( f.properties[c].replace('$','').replace(/,/g, '') );
+          if (val > max) max = val;
+          totals[c] += val;
+        })
+      });
+
+      chart(Object.keys(totals).map(function(k){ return {key: k, value: totals[k]}; }), max) 
+
+      svg.selectAll("path")
+        .data(topojson.object(us, us.objects.states).geometries)
+      .enter().append("path")
+        .attr("d", path)
+
+      svg.selectAll(".circle")
+        .data(seq.features)
+        .enter()
+        .append("circle")
+          .attr("class", "circle")
+          .attr("transform", function(d) {
+            var c = d.geometry.Coordinates;
+            if (c){
+              var centroid = projection(c);
+              x = centroid[0];
+              y = centroid[1];
+              return "translate(" + x + "," + y + ")";
+            }
+          })
+          .attr("r", function(d) { return 0;});
+
+  }
+
+  function chart( values, max ){
+    var scale = d3.scale.linear()
+      .domain([0, max])
+      .range([30, 40, 50, 60, 70, 80, 90, 100])
+
+    var div = d3.select("body").append("div")
+      .attr("id", "bars")
+
+    div.selectAll('div')
+      .data(values)
+      .enter()
+      .append("div")
+      .attr("class", "bar")
+      .text( function( d ){ return d.key.replace(/_/g, ' ').toUpperCase(); })
+      .style("background", function( d ) { return color(d.key); })
+      .style("line-height", function( d ) { return scale(d.value) + 'px'; })
+      .style("height", function(d) {
+        var barHeight = scale(d.value);
+        return barHeight + "px";
+      })
+      .on('mouseover', function( d ){
+        dots( d.key );
+      });
+  }
+
+  function dots( key ){
+    svg.selectAll(".circle").transition()
+      .duration(150)
+      .style('fill', function( d ){ return color(key); })
+      .attr("r", function(d) { return radius(d.properties[key].replace('$','').replace(/,/g, '')); });
+  }
+
+</script>
